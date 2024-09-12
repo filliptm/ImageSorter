@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Efficient Image Sorter</title>
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --warning-color: #e74c3c;
+            --info-color: #f39c12;
+            --background-color: #f5f6fa;
+            --text-color: #34495e;
+            --sidebar-width: 300px;
+            --header-height: 60px;
+            --grid-columns: 5;
+        }
+        body, html {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        .app-container {
+            display: flex;
+            height: 100%;
+        }
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: white;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 1000;
+        }
+        .sidebar.collapsed {
+            transform: translateX(calc(-1 * var(--sidebar-width)));
+        }
+        .sidebar-content {
+            padding: 20px;
+        }
+        .main-content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            margin-left: var(--sidebar-width);
+            transition: margin-left 0.3s ease;
+        }
+        .main-content.expanded {
+            margin-left: 0;
+        }
+        .header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: var(--header-height);
+        }
+        .toggle-sidebar {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        .image-container {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: repeat(var(--grid-columns), 1fr);
+            gap: 10px;
+            padding: 10px;
+            overflow-y: auto;
+        }
+        .image-item {
+            position: relative;
+            padding-bottom: 100%; /* 1:1 Aspect Ratio */
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            overflow: hidden;
+        }
+        .image-item:hover {
+            transform: scale(1.05);
+        }
+        .image-item img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .selected {
+            box-shadow: 0 0 0 3px var(--primary-color);
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #27ae60;
+        }
+        #submit-btn {
+            background-color: var(--primary-color);
+            font-size: 1.1em;
+            padding: 12px;
+        }
+        #submit-btn:hover {
+            background-color: #2980b9;
+        }
+        .directory-counts {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+        }
+        .count-item {
+            text-align: center;
+        }
+        .count-value {
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <h2>Image Sorter Controls</h2>
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="input-dir">Input Directory:</label>
+                        <input type="text" id="input-dir">
+                    </div>
+                    <div class="control-group">
+                        <label for="good-dir">Good Directory:</label>
+                        <input type="text" id="good-dir">
+                    </div>
+                    <div class="control-group">
+                        <label for="bad-dir">Bad Directory:</label>
+                        <input type="text" id="bad-dir">
+                    </div>
+                    <div class="control-group">
+                        <label for="grid-columns">Grid Columns: <span id="column-value">5</span></label>
+                        <input type="range" id="grid-columns" min="1" max="10" value="5">
+                    </div>
+                    <div class="control-group">
+                        <label for="image-count-input">Images to Display:</label>
+                        <input type="number" id="image-count-input" min="1" max="100" value="20">
+                    </div>
+                    <button id="load-images-btn">Load Images</button>
+                    <button id="save-settings-btn">Save Settings</button>
+                    <button id="reset-btn">Reset Processed</button>
+                </div>
+                <div class="directory-counts">
+                    <div class="count-item">
+                        <div>Input</div>
+                        <div id="input-count" class="count-value">0</div>
+                    </div>
+                    <div class="count-item">
+                        <div>Good</div>
+                        <div id="good-count" class="count-value">0</div>
+                    </div>
+                    <div class="count-item">
+                        <div>Bad</div>
+                        <div id="bad-count" class="count-value">0</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        <main class="main-content">
+            <header class="header">
+                <button class="toggle-sidebar">☰</button>
+                <h1>Efficient Image Sorter</h1>
+                <button id="submit-btn">Submit Selection</button>
+            </header>
+            <div id="image-container" class="image-container"></div>
+        </main>
+    </div>
+
+    <script>
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        const toggleSidebarBtn = document.querySelector('.toggle-sidebar');
+        const imageContainer = document.getElementById('image-container');
+        const submitBtn = document.getElementById('submit-btn');
+        const loadImagesBtn = document.getElementById('load-images-btn');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const gridColumnsSlider = document.getElementById('grid-columns');
+        const columnValue = document.getElementById('column-value');
+        const imageCountInput = document.getElementById('image-count-input');
+        const inputDirInput = document.getElementById('input-dir');
+        const goodDirInput = document.getElementById('good-dir');
+        const badDirInput = document.getElementById('bad-dir');
+        const inputCountElement = document.getElementById('input-count');
+        const goodCountElement = document.getElementById('good-count');
+        const badCountElement = document.getElementById('bad-count');
+        let selectedImages = new Set();
+        let displayedImages = [];
+
+        toggleSidebarBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('expanded');
+        });
+
+        async function fetchWithErrorHandling(url, options = {}) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function loadSettings() {
+            console.log('Loading settings...');
+            const settings = await fetchWithErrorHandling('/settings');
+            if (settings) {
+                inputDirInput.value = settings.input_dir || '';
+                goodDirInput.value = settings.good_dir || '';
+                badDirInput.value = settings.bad_dir || '';
+                imageCountInput.value = settings.image_count || 20;
+                gridColumnsSlider.value = settings.grid_columns || 5;
+                updateGridColumns(gridColumnsSlider.value);
+                console.log('Settings loaded successfully');
+            }
+        }
+
+        async function saveSettings() {
+            console.log('Saving settings...');
+            const settings = {
+                input_dir: inputDirInput.value,
+                good_dir: goodDirInput.value,
+                bad_dir: badDirInput.value,
+                image_count: parseInt(imageCountInput.value),
+                grid_columns: parseInt(gridColumnsSlider.value)
+            };
+            const result = await fetchWithErrorHandling('/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings),
+            });
+            if (result && result.success) {
+                alert('Settings saved successfully!');
+                console.log('Settings saved successfully');
+            }
+        }
+
+        async function loadImages() {
+            console.log('Loading images...');
+            const count = imageCountInput.value;
+            displayedImages = await fetchWithErrorHandling(`/images?count=${count}`);
+            if (displayedImages) {
+                imageContainer.innerHTML = '';
+                displayedImages.forEach(image => {
+                    const imgContainer = document.createElement('div');
+                    imgContainer.classList.add('image-item');
+                    const img = document.createElement('img');
+                    img.src = `/image/${image}`;
+                    img.alt = image;
+                    imgContainer.appendChild(img);
+                    imgContainer.addEventListener('click', () => toggleSelection(imgContainer, image));
+                    imageContainer.appendChild(imgContainer);
+                });
+                selectedImages.clear();
+                updateCounts();
+                console.log(`${displayedImages.length} images loaded successfully`);
+            }
+        }
+
+        function toggleSelection(imgElement, imageName) {
+            imgElement.classList.toggle('selected');
+            if (selectedImages.has(imageName)) {
+                selectedImages.delete(imageName);
+            } else {
+                selectedImages.add(imageName);
+            }
+            console.log(`Image ${imageName} ${selectedImages.has(imageName) ? 'selected' : 'deselected'}`);
+        }
+
+        function updateGridColumns(columns) {
+            document.documentElement.style.setProperty('--grid-columns', columns);
+            columnValue.textContent = columns;
+            console.log(`Grid columns updated to ${columns}`);
+        }
+
+        async function submitSelection() {
+            console.log('Submitting selection...');
+            const result = await fetchWithErrorHandling('/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    displayed: displayedImages,
+                    selected: Array.from(selectedImages)
+                }),
+            });
+            if (result && result.success) {
+                selectedImages.clear();
+                await loadImages();
+                console.log('Selection submitted successfully');
+            }
+        }
+
+        async function resetProcessed() {
+            console.log('Resetting processed images...');
+            const result = await fetchWithErrorHandling('/reset', { method: 'POST' });
+            if (result && result.success) {
+                await loadImages();
+                console.log('Processed images reset successfully');
+            }
+        }
+
+        async function updateCounts() {
+            console.log('Updating counts...');
+            const counts = await fetchWithErrorHandling('/counts');
+            if (counts) {
+                inputCountElement.textContent = counts.input;
+                goodCountElement.textContent = counts.good;
+                badCountElement.textContent = counts.bad;
+                console.log('Counts updated successfully');
+            }
+        }
+
+        gridColumnsSlider.addEventListener('input', (e) => updateGridColumns(e.target.value));
+        loadImagesBtn.addEventListener('click', loadImages);
+        saveSettingsBtn.addEventListener('click', saveSettings);
+        submitBtn.addEventListener('click', submitSelection);
+        resetBtn.addEventListener('click', resetProcessed);
+
+        loadSettings().then(() => {
+            loadImages();
+            updateCounts();
+        });
+    </script>
+</body>
+</html>
