@@ -1,1 +1,1 @@
-{"input_dir": "PlaceHolder", "good_dir": "PlaceHolder", "bad_dir": "PlaceHolder", "image_count": 15, "image_size": 357, "grid_columns": 3}
+{"input_dir": "C:\\AI\\ComfyUI\\output\\Character_Agmented", "good_dir": "C:\\AI\\ComfyUI\\output\\Final", "bad_dir": "C:\\Users\\Filli\\Downloads\\bad", "image_count": 10, "image_size": 357, "grid_columns": 7}
