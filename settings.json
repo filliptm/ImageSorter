@@ -1,1 +1,1 @@
-{"input_dir": "C:\\AI\\ComfyUI\\output\\PixarChar\\Character_Agmented", "good_dir": "C:\\AI\\ComfyUI\\output\\PixarChar\\Good", "bad_dir": "C:\\AI\\ComfyUI\\output\\PixarChar\\bad", "image_count": 100, "image_size": 357, "grid_columns": 7}
+{"input_dir": "C:\\AI\\ComfyUI\\output", "good_dir": "C:\\AI\\ComfyUI\\output\\PixarChar\\Good", "bad_dir": "C:\\AI\\ComfyUI\\output\\PixarChar\\bad", "image_count": 100, "image_size": 357, "grid_columns": 7}
