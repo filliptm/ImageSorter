@@ -128,25 +128,6 @@
             background-color: var(--background-color);
             color: var(--text-color);
         }
-        
-        .dir-input-container {
-            display: flex;
-            align-items: center;
-        }
-        
-        .dir-input-container input[type="text"] {
-            flex-grow: 1;
-            margin-right: 5px;
-        }
-        
-        .browse-btn {
-            background-color: var(--secondary-color);
-            color: white;
-            border: none;
-            padding: 8px;
-            border-radius: 4px;
-            cursor: pointer;
-        }
         button {
             background-color: var(--secondary-color);
             color: white;
@@ -189,24 +170,15 @@
                 <div class="controls">
                     <div class="control-group">
                         <label for="input-dir">Input Directory:</label>
-                        <div class="dir-input-container">
-                            <input type="text" id="input-dir">
-                            <button class="browse-btn" data-target="input-dir">📁</button>
-                        </div>
+                        <input type="text" id="input-dir">
                     </div>
                     <div class="control-group">
                         <label for="good-dir">Good Directory:</label>
-                        <div class="dir-input-container">
-                            <input type="text" id="good-dir">
-                            <button class="browse-btn" data-target="good-dir">📁</button>
-                        </div>
+                        <input type="text" id="good-dir">
                     </div>
                     <div class="control-group">
                         <label for="bad-dir">Bad Directory:</label>
-                        <div class="dir-input-container">
-                            <input type="text" id="bad-dir">
-                            <button class="browse-btn" data-target="bad-dir">📁</button>
-                        </div>
+                        <input type="text" id="bad-dir">
                     </div>
                     <div class="control-group">
                         <label for="grid-columns">Grid Columns: <span id="column-value">5</span></label>
@@ -404,122 +376,6 @@
         saveSettingsBtn.addEventListener('click', saveSettings);
         submitBtn.addEventListener('click', submitSelection);
         resetBtn.addEventListener('click', resetProcessed);
-
-        // Directory browsing functionality
-        document.querySelectorAll('.browse-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const targetInput = btn.getAttribute('data-target');
-                const currentPath = document.getElementById(targetInput).value || '';
-                
-                try {
-                    // Show loading indicator
-                    btn.textContent = '⏳';
-                    btn.disabled = true;
-                    
-                    const response = await fetch(`/list_directories?current=${encodeURIComponent(currentPath)}`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    
-                    // Create and show directory selection dialog
-                    const dialog = document.createElement('div');
-                    dialog.style.position = 'fixed';
-                    dialog.style.top = '50%';
-                    dialog.style.left = '50%';
-                    dialog.style.transform = 'translate(-50%, -50%)';
-                    dialog.style.backgroundColor = 'var(--card-background)';
-                    dialog.style.padding = '20px';
-                    dialog.style.borderRadius = '5px';
-                    dialog.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-                    dialog.style.zIndex = '2000';
-                    dialog.style.width = '500px';
-                    dialog.style.maxHeight = '80vh';
-                    dialog.style.overflow = 'auto';
-                    
-                    let dialogContent = `
-                        <h3>Select Directory</h3>
-                        <div style="margin-bottom: 10px;">
-                            <strong>Current: </strong>${data.current_path}
-                        </div>
-                        <div style="margin-bottom: 15px; max-height: 300px; overflow-y: auto;">
-                            ${data.parent ? `<div style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--border-color);" class="dir-item" data-path="${data.parent}">📁 ..</div>` : ''}
-                            ${data.directories.map(dir => `
-                                <div style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--border-color);" class="dir-item" data-path="${dir.path}">
-                                    📁 ${dir.name}
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <button id="cancel-dir-select" style="background-color: var(--warning-color);">Cancel</button>
-                            <button id="select-current-dir" style="background-color: var(--primary-color);">Select This Directory</button>
-                        </div>
-                    `;
-                    
-                    dialog.innerHTML = dialogContent;
-                    document.body.appendChild(dialog);
-                    
-                    // Add event listeners for directory navigation
-                    dialog.querySelectorAll('.dir-item').forEach(item => {
-                        item.addEventListener('click', async () => {
-                            const path = item.getAttribute('data-path');
-                            try {
-                                const response = await fetch(`/list_directories?current=${encodeURIComponent(path)}`);
-                                if (!response.ok) {
-                                    throw new Error(`HTTP error! status: ${response.status}`);
-                                }
-                                const newData = await response.json();
-                                
-                                // Update dialog content with new directory listing
-                                const directoryList = dialog.querySelector('div[style*="max-height"]');
-                                directoryList.innerHTML = `
-                                    ${newData.parent ? `<div style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--border-color);" class="dir-item" data-path="${newData.parent}">📁 ..</div>` : ''}
-                                    ${newData.directories.map(dir => `
-                                        <div style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--border-color);" class="dir-item" data-path="${dir.path}">
-                                            📁 ${dir.name}
-                                        </div>
-                                    `).join('')}
-                                `;
-                                
-                                // Update current path display
-                                dialog.querySelector('div[style*="margin-bottom: 10px"]').innerHTML = `<strong>Current: </strong>${newData.current_path}`;
-                                
-                                // Reattach event listeners to new directory items
-                                directoryList.querySelectorAll('.dir-item').forEach(newItem => {
-                                    newItem.addEventListener('click', function() {
-                                        const newPath = this.getAttribute('data-path');
-                                        item.click(); // Reuse the parent click handler with the new path
-                                    });
-                                });
-                            } catch (error) {
-                                console.error('Error navigating directory:', error);
-                                alert(`Error navigating directory: ${error.message}`);
-                            }
-                        });
-                    });
-                    
-                    // Cancel button closes the dialog
-                    dialog.querySelector('#cancel-dir-select').addEventListener('click', () => {
-                        document.body.removeChild(dialog);
-                    });
-                    
-                    // Select button sets the input value and closes the dialog
-                    dialog.querySelector('#select-current-dir').addEventListener('click', () => {
-                        document.getElementById(targetInput).value = data.current_path;
-                        document.body.removeChild(dialog);
-                    });
-                    
-                } catch (error) {
-                    console.error('Error browsing directories:', error);
-                    alert(`Error browsing directories: ${error.message}`);
-                } finally {
-                    // Restore button
-                    btn.textContent = '📁';
-                    btn.disabled = false;
-                }
-            });
-        });
 
         loadSettings().then(() => {
             loadImages();

@@ -3,7 +3,6 @@ import json
 import shutil
 from flask import Flask, request, jsonify, send_from_directory, render_template_string
 import argparse
-import pathlib
 
 app = Flask(__name__)
 
@@ -91,53 +90,6 @@ def get_counts():
         'good': len(os.listdir(SETTINGS['good_dir'])),
         'bad': len(os.listdir(SETTINGS['bad_dir']))
     })
-
-
-@app.route('/list_directories', methods=['GET'])
-def list_directories():
-    current = request.args.get('current', '')
-    
-    # Handle empty path or invalid path
-    if not current or not os.path.exists(current):
-        # Default to current working directory if path is invalid
-        current = os.getcwd()
-    
-    # Ensure the path is a directory
-    if not os.path.isdir(current):
-        current = os.path.dirname(current)
-    
-    # Get absolute path
-    current_abs = os.path.abspath(current)
-    
-    # Get parent directory
-    parent = os.path.dirname(current_abs) if current_abs != os.path.dirname(current_abs) else None
-    
-    # List directories
-    try:
-        directories = []
-        for item in os.listdir(current_abs):
-            item_path = os.path.join(current_abs, item)
-            if os.path.isdir(item_path):
-                directories.append({
-                    'name': item,
-                    'path': item_path
-                })
-        
-        # Sort directories alphabetically
-        directories.sort(key=lambda x: x['name'].lower())
-        
-        return jsonify({
-            'current_path': current_abs,
-            'parent': parent,
-            'directories': directories
-        })
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'current_path': current_abs,
-            'parent': parent,
-            'directories': []
-        }), 500
 
 
 if __name__ == '__main__':
