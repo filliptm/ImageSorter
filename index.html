@@ -106,9 +106,27 @@
             height: 100%;
             object-fit: contain;
         }
-        .selected {
-            box-shadow: 0 0 0 3px var(--primary-color);
-            border: 1px solid var(--primary-color);
+        .selected::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1;
+        }
+        
+        .selected::after {
+            content: "✓";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #2ecc71;
+            font-size: 3rem;
+            font-weight: bold;
+            z-index: 2;
         }
         .controls {
             display: flex;
@@ -160,6 +178,25 @@
             font-weight: bold;
             font-size: 1.2em;
         }
+        .status-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 15px;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        .auto-refresh-indicator {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -191,6 +228,12 @@
                     <button id="load-images-btn">Load Images</button>
                     <button id="save-settings-btn">Save Settings</button>
                     <button id="reset-btn">Reset Processed</button>
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="auto-refresh-toggle" checked>
+                            Auto-refresh <span id="auto-refresh-status" class="auto-refresh-indicator">●</span>
+                        </label>
+                    </div>
                 </div>
                 <div class="directory-counts">
                     <div class="count-item">
@@ -237,8 +280,13 @@
         const inputCountElement = document.getElementById('input-count');
         const goodCountElement = document.getElementById('good-count');
         const badCountElement = document.getElementById('bad-count');
+        const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
+        const autoRefreshStatus = document.getElementById('auto-refresh-status');
+        
         let selectedImages = new Set();
         let displayedImages = [];
+        let autoRefreshInterval = null;
+        let lastTotalAvailable = 0;
 
         toggleSidebarBtn.addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
@@ -294,25 +342,73 @@
             }
         }
 
-        async function loadImages() {
-            console.log('Loading images...');
+        async function loadImages(isAutoRefresh = false) {
+            console.log(isAutoRefresh ? 'Auto-refreshing images...' : 'Loading images...');
             const count = imageCountInput.value;
-            displayedImages = await fetchWithErrorHandling(`/images?count=${count}`);
-            if (displayedImages) {
+            const response = await fetchWithErrorHandling(`/images?count=${count}`);
+            
+            if (response) {
+                const images = response.images || [];
+                const totalAvailable = response.total_available || 0;
+                
+                // If this is an auto-refresh and no changes in available images, don't update UI
+                if (isAutoRefresh && 
+                    images.length === displayedImages.length && 
+                    totalAvailable === lastTotalAvailable &&
+                    images.every((img, i) => img === displayedImages[i])) {
+                    console.log('No changes detected during auto-refresh');
+                    return;
+                }
+                
+                // Update the displayed images
+                displayedImages = images;
+                lastTotalAvailable = totalAvailable;
+                
+                // Clear the container
                 imageContainer.innerHTML = '';
-                displayedImages.forEach(image => {
-                    const imgContainer = document.createElement('div');
-                    imgContainer.classList.add('image-item');
-                    const img = document.createElement('img');
-                    img.src = `/image/${image}`;
-                    img.alt = image;
-                    imgContainer.appendChild(img);
-                    imgContainer.addEventListener('click', () => toggleSelection(imgContainer, image));
-                    imageContainer.appendChild(imgContainer);
-                });
-                selectedImages.clear();
+                
+                // Add images to the container
+                if (images.length > 0) {
+                    images.forEach(image => {
+                        const imgContainer = document.createElement('div');
+                        imgContainer.classList.add('image-item');
+                        const img = document.createElement('img');
+                        img.src = `/image/${image}`;
+                        img.alt = image;
+                        imgContainer.appendChild(img);
+                        
+                        // If this image was previously selected, mark it as selected
+                        if (selectedImages.has(image)) {
+                            imgContainer.classList.add('selected');
+                        }
+                        
+                        imgContainer.addEventListener('click', () => toggleSelection(imgContainer, image));
+                        imageContainer.appendChild(imgContainer);
+                    });
+                    
+                    // If we have more images available than we're showing, add a message
+                    if (totalAvailable > images.length) {
+                        const statusMsg = document.createElement('div');
+                        statusMsg.className = 'status-message';
+                        statusMsg.textContent = `Showing ${images.length} of ${totalAvailable} available images`;
+                        imageContainer.appendChild(statusMsg);
+                    }
+                } else {
+                    // No images to display
+                    const noImagesMsg = document.createElement('div');
+                    noImagesMsg.className = 'status-message';
+                    noImagesMsg.textContent = 'No images available in the input directory';
+                    noImagesMsg.style.gridColumn = '1 / -1';
+                    imageContainer.appendChild(noImagesMsg);
+                }
+                
+                // Only clear selections on manual refresh
+                if (!isAutoRefresh) {
+                    selectedImages.clear();
+                }
+                
                 updateCounts();
-                console.log(`${displayedImages.length} images loaded successfully`);
+                console.log(`${images.length} images loaded successfully (${totalAvailable} available)`);
             }
         }
 
@@ -370,16 +466,62 @@
                 console.log('Counts updated successfully');
             }
         }
+        
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            
+            autoRefreshInterval = setInterval(() => {
+                if (autoRefreshToggle.checked) {
+                    loadImages(true);
+                }
+            }, 5000); // Check every 5 seconds
+            
+            autoRefreshStatus.style.display = 'inline-block';
+            console.log('Auto-refresh started');
+        }
+        
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            
+            autoRefreshStatus.style.display = 'none';
+            console.log('Auto-refresh stopped');
+        }
+        
+        // Toggle auto-refresh when checkbox is clicked
+        autoRefreshToggle.addEventListener('change', () => {
+            if (autoRefreshToggle.checked) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        });
 
         gridColumnsSlider.addEventListener('input', (e) => updateGridColumns(e.target.value));
-        loadImagesBtn.addEventListener('click', loadImages);
+        loadImagesBtn.addEventListener('click', () => loadImages(false));
         saveSettingsBtn.addEventListener('click', saveSettings);
         submitBtn.addEventListener('click', submitSelection);
         resetBtn.addEventListener('click', resetProcessed);
 
+        // Stop auto-refresh when the page is hidden and restart when visible again
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else if (autoRefreshToggle.checked) {
+                startAutoRefresh();
+            }
+        });
+
         loadSettings().then(() => {
             loadImages();
             updateCounts();
+            if (autoRefreshToggle.checked) {
+                startAutoRefresh();
+            }
         });
     </script>
 </body>

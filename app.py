@@ -47,10 +47,23 @@ def handle_settings():
 @app.route('/images', methods=['GET'])
 def get_images():
     count = int(request.args.get('count', SETTINGS['image_count']))
-    all_images = set(os.listdir(SETTINGS['input_dir']))
-    unprocessed_images = list(all_images - PROCESSED_IMAGES)
-    batch = unprocessed_images[:count]
-    return jsonify(batch)
+    # Always get the current list of images from the directory
+    try:
+        all_images = set(os.listdir(SETTINGS['input_dir']))
+        unprocessed_images = list(all_images - PROCESSED_IMAGES)
+        # Sort the images to ensure consistent ordering
+        unprocessed_images.sort()
+        batch = unprocessed_images[:count]
+        return jsonify({
+            'images': batch,
+            'total_available': len(unprocessed_images)
+        })
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'images': [],
+            'total_available': 0
+        }), 500
 
 
 @app.route('/submit', methods=['POST'])
